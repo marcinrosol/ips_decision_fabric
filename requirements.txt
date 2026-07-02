@@ -1,0 +1,8 @@
+Flask>=3.0
+pymupdf
+pytesseract
+Pillow
+sentence-transformers
+chromadb
+mcp
+ollama

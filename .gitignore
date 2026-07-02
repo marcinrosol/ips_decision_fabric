@@ -1,0 +1,26 @@
+# IPS proceedings corpus -- large binaries + a credential file
+# ("intsoc login.txt"), never committed. Supply separately before running
+# the ingestion pipeline; see README.md.
+data/corpus/*
+
+# Generated vector store (python -m pipeline.run / backfill_articles.py
+# rebuilds this from data/corpus/).
+data/vector_store/
+
+# Generated inventory DB (python data/inventory/seed.py rebuilds this).
+data/inventory/inventory.db
+data/inventory/inventory.db-wal
+data/inventory/inventory.db-shm
+
+# Machine-specific: which local Ollama model this machine's GPU can run,
+# written by scripts/setup.py. Not portable across machines.
+agents/model.txt
+
+# Personal Claude Code settings, not shared config.
+.claude/settings.local.json
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env

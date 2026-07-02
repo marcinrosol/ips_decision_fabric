@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>IPS Decision Fabric &mdash; Live Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="sim-header">
+    <div class="sim-header-row">
+      <h1>IPS Decision Fabric</h1>
+      <div class="engine-status">
+        <span id="running-dot" class="dot dot-stopped"></span>
+        <span id="running-text">Unknown</span>
+      </div>
+    </div>
+    <div class="sim-stats">
+      <div class="stat"><span class="stat-label">Sim date</span><span id="sim-date" class="stat-value">--</span></div>
+      <div class="stat"><span class="stat-label">Sim days processed</span><span id="days-processed" class="stat-value">--</span></div>
+      <div class="stat"><span class="stat-label">Speed</span><span id="speed-factor" class="stat-value">--</span></div>
+      <div class="stat"><span class="stat-label">Last update</span><span id="updated-at" class="stat-value">--</span></div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar">
+        <div id="progress-fill" class="progress-fill"></div>
+        <div id="progress-marker" class="progress-marker"></div>
+      </div>
+      <div class="progress-labels">
+        <span id="horizon-start">--</span>
+        <span id="horizon-end">--</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="inventory-panel">
+      <h2>Inventory Status</h2>
+      <div id="inventory-grid" class="inventory-grid"></div>
+    </section>
+
+    <section class="events-panel">
+      <h2>Live Event Log</h2>
+      <ul id="event-log" class="event-log"></ul>
+    </section>
+  </main>
+
+  <section class="review-panel">
+    <div class="review-header">
+      <h2>Pending Review</h2>
+      <input id="reviewer-name" type="text" placeholder="Your name" autocomplete="off">
+    </div>
+    <div class="review-columns">
+      <div class="review-column">
+        <h3>Decisions</h3>
+        <div id="decisions-list" class="review-list"></div>
+      </div>
+      <div class="review-column">
+        <h3>Draft Purchase Orders</h3>
+        <div id="pos-list" class="review-list"></div>
+      </div>
+      <div class="review-column">
+        <h3>Pending Experiments</h3>
+        <div id="experiments-list" class="review-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="chat-panel">
+    <h2>Ask the Decision Assistant</h2>
+    <div id="chat-log" class="chat-log"></div>
+    <form id="chat-form" class="chat-form">
+      <input id="chat-input" type="text" autocomplete="off"
+             placeholder="e.g. what's a stable red star composition using strontium carbonate, and do we have stock?">
+      <button type="submit" id="chat-submit">Ask</button>
+    </form>
+  </section>
+
+  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+</body>
+</html>
