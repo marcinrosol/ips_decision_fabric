@@ -32,18 +32,21 @@ Draft/Pending records for a human to review -- never claim something has been \
 ordered or approved."""
 
 
-async def answer(question: str) -> dict:
-    """Runs the full tool-calling loop for one question. Returns
-    {"response": str, "tool_calls": [{"name", "args", "result"}, ...]}."""
+async def answer(question: str, history: list[dict] | None = None) -> dict:
+    """Runs the full tool-calling loop for one question, continuing from any
+    prior turns in `history` (as returned by a previous call -- excludes the
+    system prompt, which is always reconstructed fresh here). Returns
+    {"response": str, "tool_calls": [{"name", "args", "result"}, ...],
+    "history": [...]} -- pass "history" back into the next call for
+    conversation continuity."""
     client = ollama.AsyncClient()
     tool_calls_made = []
 
     async with mcp_bridge.connect() as session:
         tools = await mcp_bridge.list_ollama_tools(session)
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": question},
-        ]
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages.extend(history or [])
+        messages.append({"role": "user", "content": question})
 
         for _ in range(MAX_TOOL_ROUNDS):
             response = await client.chat(model=MODEL, messages=messages, tools=tools)
@@ -52,7 +55,11 @@ async def answer(question: str) -> dict:
 
             tool_calls = message.get("tool_calls")
             if not tool_calls:
-                return {"response": message.get("content") or "", "tool_calls": tool_calls_made}
+                return {
+                    "response": message.get("content") or "",
+                    "tool_calls": tool_calls_made,
+                    "history": messages[1:],
+                }
 
             for call in tool_calls:
                 name = call["function"]["name"]
@@ -64,4 +71,5 @@ async def answer(question: str) -> dict:
         return {
             "response": "Reached the tool-call limit without a final answer -- try rephrasing.",
             "tool_calls": tool_calls_made,
+            "history": messages[1:],
         }

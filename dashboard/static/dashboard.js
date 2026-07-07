@@ -86,6 +86,190 @@ function renderInventory(chemicals) {
   }
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+const TIMELINE_ROW_HEIGHT = 32;
+const TIMELINE_AXIS_HEIGHT = 24;
+const RISK_COLOR = {
+  Low: "var(--status-good)",
+  Moderate: "var(--status-warning)",
+  High: "var(--status-serious)",
+  Severe: "var(--status-critical)",
+};
+const tooltip = document.getElementById("chart-tooltip");
+
+function showTooltip(evt, exp) {
+  tooltip.innerHTML = "";
+  const title = document.createElement("div");
+  title.className = "tt-title";
+  title.textContent = `${exp.experiment_code} — ${exp.title}`;
+  tooltip.appendChild(title);
+
+  const rows = [
+    `Lead: ${exp.lead_chemist} · Site: ${exp.test_site || "--"}`,
+    `Scheduled: ${exp.scheduled_date} · Duration: ${exp.duration_minutes ?? "--"} min`,
+    `Risk: ${exp.risk_level} · Status: ${exp.status} (approval: ${exp.approval_status})`,
+  ];
+  if (exp.objective) rows.push(`Objective: ${exp.objective}`);
+  for (const text of rows) {
+    const div = document.createElement("div");
+    div.className = "tt-row";
+    div.textContent = text;
+    tooltip.appendChild(div);
+  }
+  if (exp.ips_reference_citation) {
+    const cite = document.createElement("div");
+    cite.className = "tt-citation";
+    cite.textContent = exp.ips_reference_citation;
+    tooltip.appendChild(cite);
+  }
+
+  tooltip.style.display = "block";
+  moveTooltip(evt);
+}
+
+function moveTooltip(evt) {
+  const pad = 14;
+  let x = evt.clientX + pad;
+  let y = evt.clientY + pad;
+  if (x + 320 > window.innerWidth) x = evt.clientX - 320 - pad;
+  if (y + 140 > window.innerHeight) y = evt.clientY - 140 - pad;
+  tooltip.style.left = `${x}px`;
+  tooltip.style.top = `${y}px`;
+}
+
+function hideTooltip() {
+  tooltip.style.display = "none";
+}
+
+function setRowHover(id, on) {
+  const label = document.querySelector(`.timeline-label-row[data-id="${id}"]`);
+  const mark = document.querySelector(`.timeline-mark[data-id="${id}"]`);
+  if (label) label.classList.toggle("row-hover", on);
+  if (mark) mark.setAttribute("r", on ? 8 : 6);
+}
+
+function renderTimeline(experiments, simStatus) {
+  const labelsEl = document.getElementById("timeline-labels");
+  const plotEl = document.getElementById("timeline-plot");
+  const savedScrollTop = labelsEl.scrollTop;
+  labelsEl.innerHTML = "";
+  plotEl.innerHTML = "";
+
+  if (!experiments || experiments.length === 0 || !simStatus || !simStatus.horizon_start) {
+    labelsEl.textContent = "No experiments scheduled yet.";
+    return;
+  }
+
+  const start = parseDate(simStatus.horizon_start);
+  const end = parseDate(simStatus.horizon_end);
+  const span = Math.max(1, end - start);
+  const now = parseDate(simStatus.sim_now);
+
+  const plotWidth = Math.max(plotEl.clientWidth, 400);
+  const height = experiments.length * TIMELINE_ROW_HEIGHT + TIMELINE_AXIS_HEIGHT;
+
+  const xOf = (dateStr) => {
+    const pct = Math.max(0, Math.min(1, (parseDate(dateStr) - start) / span));
+    return pct * (plotWidth - 20) + 10;
+  };
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("width", "100%");
+  svg.setAttribute("height", height);
+  svg.setAttribute("viewBox", `0 0 ${plotWidth} ${height}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+
+  // Date axis ticks (5 evenly spaced).
+  const TICKS = 5;
+  for (let i = 0; i <= TICKS; i++) {
+    const t = start.getTime() + (span * i) / TICKS;
+    const x = xOf(new Date(t).toISOString().slice(0, 10));
+    const line = document.createElementNS(SVG_NS, "line");
+    line.setAttribute("x1", x);
+    line.setAttribute("x2", x);
+    line.setAttribute("y1", TIMELINE_AXIS_HEIGHT);
+    line.setAttribute("y2", height);
+    line.setAttribute("class", "timeline-tick-line");
+    svg.appendChild(line);
+
+    const label = document.createElementNS(SVG_NS, "text");
+    label.setAttribute("x", x);
+    label.setAttribute("y", TIMELINE_AXIS_HEIGHT - 8);
+    label.setAttribute("class", "timeline-tick-label");
+    label.setAttribute("text-anchor", i === 0 ? "start" : i === TICKS ? "end" : "middle");
+    label.textContent = new Date(t).toISOString().slice(0, 10);
+    svg.appendChild(label);
+  }
+
+  experiments.forEach((exp, i) => {
+    const rowLabel = document.createElement("div");
+    rowLabel.className = "timeline-label-row";
+    rowLabel.dataset.id = exp.schedule_id;
+    const isDone = exp.status === "Completed" || exp.status === "Cancelled";
+    if (isDone) rowLabel.classList.add("row-dim");
+    rowLabel.innerHTML = `<span class="exp-code">${exp.experiment_code}</span><span class="exp-title">${exp.title}</span>`;
+    labelsEl.appendChild(rowLabel);
+
+    const cy = TIMELINE_AXIS_HEIGHT + i * TIMELINE_ROW_HEIGHT + TIMELINE_ROW_HEIGHT / 2;
+    const cx = xOf(exp.scheduled_date);
+
+    const hit = document.createElementNS(SVG_NS, "circle");
+    hit.setAttribute("cx", cx);
+    hit.setAttribute("cy", cy);
+    hit.setAttribute("r", 14);
+    hit.setAttribute("class", "timeline-mark-hit");
+    hit.dataset.id = exp.schedule_id;
+
+    const mark = document.createElementNS(SVG_NS, "circle");
+    mark.setAttribute("cx", cx);
+    mark.setAttribute("cy", cy);
+    mark.setAttribute("r", 6);
+    mark.setAttribute("fill", RISK_COLOR[exp.risk_level] || "var(--text-dim)");
+    mark.setAttribute("class", "timeline-mark" + (isDone ? " row-dim" : ""));
+    mark.dataset.id = exp.schedule_id;
+
+    const onEnter = (evt) => {
+      setRowHover(exp.schedule_id, true);
+      showTooltip(evt, exp);
+    };
+    const onMove = (evt) => moveTooltip(evt);
+    const onLeave = () => {
+      setRowHover(exp.schedule_id, false);
+      hideTooltip();
+    };
+
+    hit.addEventListener("pointerenter", onEnter);
+    hit.addEventListener("pointermove", onMove);
+    hit.addEventListener("pointerleave", onLeave);
+    rowLabel.addEventListener("pointerenter", onEnter);
+    rowLabel.addEventListener("pointermove", onMove);
+    rowLabel.addEventListener("pointerleave", onLeave);
+
+    svg.appendChild(hit);
+    svg.appendChild(mark);
+  });
+
+  // "Now" marker, drawn last so it sits on top of gridlines.
+  if (now >= start && now <= end) {
+    const nowLine = document.createElementNS(SVG_NS, "line");
+    const x = xOf(simStatus.sim_now.split(" ")[0]);
+    nowLine.setAttribute("x1", x);
+    nowLine.setAttribute("x2", x);
+    nowLine.setAttribute("y1", 0);
+    nowLine.setAttribute("y2", height);
+    nowLine.setAttribute("class", "timeline-now-line");
+    svg.appendChild(nowLine);
+  }
+
+  plotEl.appendChild(svg);
+  labelsEl.scrollTop = savedScrollTop;
+  plotEl.scrollTop = savedScrollTop;
+
+  // Keep the label column and plot area scrolled together.
+  labelsEl.onscroll = () => { plotEl.scrollTop = labelsEl.scrollTop; };
+  plotEl.onscroll = () => { labelsEl.scrollTop = plotEl.scrollTop; };
+}
+
 function renderEvents(events) {
   const log = document.getElementById("event-log");
   log.innerHTML = "";
@@ -228,6 +412,7 @@ async function poll() {
     renderInventory(data.inventory);
     renderEvents(data.events);
     renderReviewQueue(data);
+    renderTimeline(data.experiments_timeline, data.sim_status);
   } catch (err) {
     console.error("Failed to fetch /api/state", err);
   }
@@ -293,4 +478,19 @@ async function sendChatMessage(event) {
 
 if (chatForm) {
   chatForm.addEventListener("submit", sendChatMessage);
+}
+
+const chatReset = document.getElementById("chat-reset");
+if (chatReset) {
+  chatReset.addEventListener("click", async () => {
+    chatReset.disabled = true;
+    try {
+      await fetch("/api/chat/reset", { method: "POST" });
+      chatLog.innerHTML = "";
+    } catch (err) {
+      console.error("Failed to reset chat", err);
+    } finally {
+      chatReset.disabled = false;
+    }
+  });
 }

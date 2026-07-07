@@ -119,6 +119,20 @@ def get_draft_purchase_orders(db_path: Path = DB_PATH) -> list[dict]:
         conn.close()
 
 
+def get_experiment_timeline(db_path: Path = DB_PATH) -> list[dict]:
+    conn = _connect(db_path)
+    try:
+        rows = conn.execute(
+            """SELECT schedule_id, experiment_code, title, objective, lead_chemist,
+                      scheduled_date, duration_minutes, test_site, risk_level, status,
+                      approval_status, approved_by, ips_reference_citation
+               FROM Experiment_Schedule ORDER BY scheduled_date"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
 def get_pending_experiments(db_path: Path = DB_PATH) -> list[dict]:
     conn = _connect(db_path)
     try:

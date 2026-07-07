@@ -4,6 +4,7 @@ Usage (from repo root): python -m dashboard.app
 """
 
 import asyncio
+import threading
 from datetime import datetime, timezone
 
 from flask import Flask, jsonify, render_template, request
@@ -14,6 +15,13 @@ from dashboard import actions, queries
 app = Flask(__name__)
 
 STALE_SECONDS = 15
+
+# In-memory chat history for the dashboard's single chat panel -- process-wide,
+# not per-browser-session. Resets on dashboard restart or /api/chat/reset.
+# Guarded by a lock since Flask's dev server handles requests on multiple
+# threads.
+_chat_history: list[dict] = []
+_chat_lock = threading.Lock()
 
 
 def _is_running(updated_at: str | None) -> bool:
@@ -39,6 +47,7 @@ def api_state():
         "pending_decisions": queries.get_pending_decisions(),
         "draft_purchase_orders": queries.get_draft_purchase_orders(),
         "pending_experiments": queries.get_pending_experiments(),
+        "experiments_timeline": queries.get_experiment_timeline(),
     }
     return jsonify(payload)
 
@@ -48,8 +57,23 @@ def api_chat():
     message = (request.get_json(silent=True) or {}).get("message", "").strip()
     if not message:
         return jsonify({"error": "message is required"}), 400
-    result = asyncio.run(agent_loop.answer(message))
-    return jsonify(result)
+
+    with _chat_lock:
+        history = list(_chat_history)
+
+    result = asyncio.run(agent_loop.answer(message, history=history))
+
+    with _chat_lock:
+        _chat_history[:] = result["history"]
+
+    return jsonify({"response": result["response"], "tool_calls": result["tool_calls"]})
+
+
+@app.route("/api/chat/reset", methods=["POST"])
+def api_chat_reset():
+    with _chat_lock:
+        _chat_history.clear()
+    return jsonify({"ok": True})
 
 
 def _require_reviewer() -> str | tuple:
