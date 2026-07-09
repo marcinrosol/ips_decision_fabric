@@ -4,6 +4,7 @@ Usage (from repo root): python -m dashboard.app
 """
 
 import asyncio
+import os
 import threading
 from datetime import datetime, timezone
 
@@ -142,4 +143,4 @@ def reject_experiment_route(schedule_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=False, port=5000)
+    app.run(debug=False, host=os.environ.get("DASHBOARD_HOST", "127.0.0.1"), port=5000)

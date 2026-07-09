@@ -1,0 +1,24 @@
+services:
+  dashboard:
+    build: .
+    image: ips-decision-fabric:latest
+    command: python -m dashboard.app
+    ports:
+      - "5000:5000"
+    environment:
+      DASHBOARD_HOST: "0.0.0.0"
+      OLLAMA_HOST: "http://host.docker.internal:11434"
+      OLLAMA_MODEL: "qwen2.5:72b"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # no-op on Docker Desktop; needed on Linux Docker Engine
+    volumes:
+      - ./data/inventory:/app/data/inventory
+      - ./data/vector_store:/app/data/vector_store
+    restart: unless-stopped
+
+  simulation:
+    image: ips-decision-fabric:latest   # reuses the image `dashboard` builds -- no second `build:` key
+    command: python -m simulation.run
+    volumes:
+      - ./data/inventory:/app/data/inventory
+    restart: unless-stopped

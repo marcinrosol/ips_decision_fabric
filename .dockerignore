@@ -1,0 +1,18 @@
+.git/
+.claude/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Never let the ingestion-only corpus (incl. a credential file, "intsoc login.txt") or
+# the generated vector store into the build context at all -- not just the final image.
+data/corpus/
+data/vector_store/
+data/inventory/inventory.db
+data/inventory/inventory.db-wal
+data/inventory/inventory.db-shm
+
+# Machine-specific; superseded by the OLLAMA_MODEL env var in-container.
+agents/model.txt

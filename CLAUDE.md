@@ -63,7 +63,13 @@ over go in `inventory_snapshot_summary`).
   to `Submitted`, which the engine then carries forward on its own). Working.
 - `requirements.txt`: Flask, plus the ingestion/agent stack — `pymupdf`, `pytesseract`,
   `Pillow`, `sentence-transformers`, `chromadb`, `mcp`, `ollama`.
-- Not currently a git repository — nothing here has version history yet.
+- **`Dockerfile` / `docker-compose.yml`** — containerizes `dashboard/`, `simulation/`, and
+  the `agents/`+`mcp_servers/` chat layer (multi-stage build, CPU-only torch, the
+  embedding model pre-warmed into the image). The PDF ingestion pipeline stays a native,
+  one-time step, and Ollama stays running natively on the host — containers reach it via
+  `OLLAMA_HOST=http://host.docker.internal:11434` (requires Ollama's own
+  `OLLAMA_HOST=0.0.0.0` host-side, since it binds to loopback by default). See README.md's
+  "Running with Docker" section. Working.
 - No automated tests exist anywhere in the repo; everything has been verified with manual
   smoke tests so far.
 
@@ -114,8 +120,7 @@ needs refreshing — it's the only way the two stay in sync (there's no migratio
   conventions (`pipeline/store.py` for Chroma access, `mcp_servers/server.py`'s tool
   functions, `agents/loop.py`'s manual tool-call loop, `dashboard/queries.py` vs.
   `dashboard/actions.py`'s read/write connection split) before introducing new patterns.
-- Known gaps, in rough priority order: no git history for anything built so far (consider
-  `git init` before further major changes); no automated tests; article-level citations
+- Known gaps, in rough priority order: no automated tests; article-level citations
   don't cover the full corpus (see `pipeline/` above); the agent's tool-call arguments
   aren't always well-formed (e.g. it has sent `unit_cost_usd` instead of
   `draft_purchase_order`'s actual `unit_cost` parameter, silently dropping the value —
